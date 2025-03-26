@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+    <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
+
+    in vec4 vPosition;
+    in vec3 vNormal;
+    in vec2 vTexCoord;
+
+    out vec2 fTexCoord;
+    out vec3 fNormal;
+    out vec3 fPosition;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 normalMatrix;
+    uniform mat4 projectionMatrix;
+
+    void main() {
+        fPosition = (modelViewMatrix * vPosition).xyz;  // Pass transformed position
+        fNormal = normalize((normalMatrix * vec4(vNormal, 0.0)).xyz);  // Pass transformed normal
+        fTexCoord = vTexCoord;  // Pass texture coordinates
+
+        gl_Position = projectionMatrix * modelViewMatrix * vPosition; // Compute final vertex position
+    }
+    </script>
+        
+
+    <script id="fragment-shader" type="x-shader/x-fragment">#version 300 es
+
+        precision mediump float;
+        
+        in vec2 fTexCoord;   // Texture coordinates
+        in vec3 fNormal;     // Surface normal
+        in vec3 fPosition;   // Fragment position in world space
+        
+        uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+        uniform vec4 lightPosition;
+        uniform float shininess;
+        uniform sampler2D texture1;
+        uniform int useTextures;
+        uniform int applyOutline; // Toggle for outline effect (0 = Off, 1 = On)
+        
+        out vec4 fragColor;
+        
+        void main() {
+            // Move all lighting computations to the fragment shader to achieve per-fragment lighting
+
+            // Normalize vectors
+            vec3 N = normalize(fNormal);  // Surface normal
+            vec3 L = normalize(lightPosition.xyz - fPosition);  // Light direction
+            vec3 V = normalize(-fPosition);  // View direction
+            vec3 H = normalize(L + V);  // Halfway vector for Blinn-Phong specular
+        
+            // Compute diffuse lighting - Lambertian reflection - per fragment
+            float diff = max(dot(N, L), 0.0);
+            vec4 diffuse = diffuseProduct * diff;
+        
+            // Compute specular lighting - Blinn-Phong reflection - per fragment (Coverted from Phong to Blinn-Phong as per (6.))
+            float specFactor = pow(max(dot(N, H), 0.0), shininess);
+            vec4 specular = specularProduct * specFactor;
+        
+            // Compute final lighting color per fregment
+            vec4 lightingColor = ambientProduct + diffuse + specular;
+            lightingColor.a = 1.0;
+        
+            // Apply texture if enabled
+            vec4 textureColor = texture(texture1, fTexCoord);
+            fragColor = lightingColor * textureColor;
+        
+            // Added Edge Highlighting Effect for (7.) - Highlights object edges based on the viewing angle
+            // Apply texture effect if enabled
+            if (applyOutline == 1) {
+                // Strongest effect on edges, weakest on flat surfaces
+                // If perpendicular to the view direction, the effect is stronger.
+                // This detects edges by checking how much the normal vector (N) aligns with the view direction (V). 
+                // It works by measuring the dot product between the normal (N) and view direction (V).
+                // The less aligned they are, the stronger the outline.
+
+                float edgeFactor = 1.0 - abs(dot(N, V));  // Compute edge intensity
+
+                // The outline effect is blended into the existing color. 
+                // A stronger effect makes the edges appear brighter.
+
+                fragColor.rgb += edgeFactor * 0.5; // Blend outline effect into fragment color
+            }
+        }
+        </script>
+        
+        
+        
+            
+    
+
+  <script type="text/javascript" src="Common/webgl-utils.js"></script>
+  <script type="text/javascript" src="Common/initShaders.js"></script>
+
+  <script type="text/javascript" src="Common/MV.js"></script>
+  <script type="text/javascript" src="objects.js"></script>
+  <script type="text/javascript" src="main.js"></script>
+
+  <body>
+    <canvas id="gl-canvas" width="512" height="512">
+      Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+
+    <br />
+    <br />
+
+    <div id="textureToggleButton">
+      <input id="textureToggleButtoni" type="button" value="Toggle Textures" />
+    </div>
+    <!-- Added toggle button for edge effect -->
+    <div id="outlineToggleButton">
+        <input id="outlineToggle" type="button" value="Toggle Outline Effect" />
+    </div>
+    
+  </body>
+</html>
